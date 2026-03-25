@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #eee;
+  }
+
+  /* ── Mode Select Screen ── */
+  #mode-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  #mode-screen h1 {
+    font-size: 48px;
+    letter-spacing: 8px;
+    color: #e94560;
+    text-shadow: 0 0 20px #e94560;
+  }
+  #mode-screen p {
+    color: #888;
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+  .mode-buttons {
+    display: flex;
+    gap: 16px;
+  }
+  .mode-btn {
+    padding: 14px 28px;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    border: 2px solid;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .mode-btn.easy   { color: #00f000; border-color: #00f000; }
+  .mode-btn.medium { color: #f0a000; border-color: #f0a000; }
+  .mode-btn.hard   { color: #e94560; border-color: #e94560; }
+  .mode-btn.easy:hover   { background: #00f000; color: #000; box-shadow: 0 0 14px #00f000; }
+  .mode-btn.medium:hover { background: #f0a000; color: #000; box-shadow: 0 0 14px #f0a000; }
+  .mode-btn.hard:hover   { background: #e94560; color: #000; box-shadow: 0 0 14px #e94560; }
+  .mode-desc {
+    display: flex;
+    gap: 16px;
+  }
+  .mode-desc div {
+    width: 120px;
+    text-align: center;
+    font-size: 10px;
+    color: #555;
+    line-height: 1.6;
+  }
+
+  /* ── Game Screen ── */
+  #game-screen { display: none; }
+  #game-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  canvas {
+    border: 2px solid #444;
+    background: #0d0d0d;
+  }
+  #sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 120px;
+  }
+  .panel {
+    background: #16213e;
+    border: 1px solid #444;
+    padding: 12px;
+    border-radius: 4px;
+  }
+  .panel h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .panel .value {
+    font-size: 22px;
+    color: #e94560;
+    font-weight: bold;
+  }
+  #mode-badge {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  #mode-badge.easy   { background: rgba(0,240,0,0.12);   color: #00f000; border: 1px solid #00f000; }
+  #mode-badge.medium { background: rgba(240,160,0,0.12); color: #f0a000; border: 1px solid #f0a000; }
+  #mode-badge.hard   { background: rgba(233,69,96,0.12); color: #e94560; border: 1px solid #e94560; }
+  #next-canvas { display: block; border: none; background: transparent; }
+  #controls { font-size: 11px; color: #666; line-height: 1.8; }
+  #controls span { color: #aaa; }
+  #menu-btn {
+    width: 100%;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    background: transparent;
+    border: 1px solid #444;
+    color: #666;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  #menu-btn:hover { border-color: #888; color: #aaa; }
+
+  /* ── Overlay message ── */
+  #message {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #e94560;
+    font-size: 22px;
+    font-weight: bold;
+    text-align: center;
+    pointer-events: none;
+    text-shadow: 0 0 10px #e94560;
+    display: none;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- Mode Selection -->
+<div id="mode-screen">
+  <h1>TETRIS</h1>
+  <p>SELECT DIFFICULTY</p>
+  <div class="mode-buttons">
+    <button class="mode-btn easy"   onclick="startGame('easy')">EASY</button>
+    <button class="mode-btn medium" onclick="startGame('medium')">MEDIUM</button>
+    <button class="mode-btn hard"   onclick="startGame('hard')">HARD</button>
+  </div>
+  <div class="mode-desc">
+    <div><span style="color:#00f000">EASY</span><br>Slow speed<br>Ghost piece<br>Gentle ramp</div>
+    <div><span style="color:#f0a000">MEDIUM</span><br>Normal speed<br>Ghost piece<br>Steady ramp</div>
+    <div><span style="color:#e94560">HARD</span><br>Fast speed<br>No ghost<br>Steep ramp</div>
+  </div>
+</div>
+
+<!-- Game -->
+<div id="game-screen">
+  <div id="game-container">
+    <canvas id="board" width="300" height="600"></canvas>
+    <div id="sidebar">
+      <div id="mode-badge">easy</div>
+      <div class="panel">
+        <h3>Score</h3>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="panel">
+        <h3>Lines</h3>
+        <div class="value" id="lines">0</div>
+      </div>
+      <div class="panel">
+        <h3>Level</h3>
+        <div class="value" id="level">1</div>
+      </div>
+      <div class="panel">
+        <h3>Next</h3>
+        <canvas id="next-canvas" width="100" height="80"></canvas>
+      </div>
+      <div class="panel" id="controls">
+        <span>← →</span> Move<br>
+        <span>↑</span> Rotate<br>
+        <span>↓</span> Soft drop<br>
+        <span>Space</span> Hard drop<br>
+        <span>P</span> Pause
+      </div>
+      <button id="menu-btn" onclick="goToMenu()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="message"></div>
+
+<script>
+const COLS = 10, ROWS = 20, BLOCK = 30;
+
+const COLORS = [
+  null,
+  '#00f0f0','#0000f0','#f0a000','#f0f000','#00f000','#a000f0','#f00000'
+];
+const PIECES = [
+  null,
+  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  [[2,0,0],[2,2,2],[0,0,0]],
+  [[0,0,3],[3,3,3],[0,0,0]],
+  [[4,4],[4,4]],
+  [[0,5,5],[5,5,0],[0,0,0]],
+  [[0,6,0],[6,6,6],[0,0,0]],
+  [[7,7,0],[0,7,7],[0,0,0]],
+];
+
+// Difficulty configs
+const MODES = {
+  easy: {
+    startInterval: 900,   // ms per drop at level 1
+    minInterval:   200,   // fastest it gets
+    levelStep:     60,    // ms reduction per level
+    linesPerLevel: 12,    // lines needed to level up
+    scoreMulti:    1.0,
+    ghost:         true,
+    color:         '#00f000',
+  },
+  medium: {
+    startInterval: 600,
+    minInterval:   100,
+    levelStep:     50,
+    linesPerLevel: 10,
+    scoreMulti:    1.5,
+    ghost:         true,
+    color:         '#f0a000',
+  },
+  hard: {
+    startInterval: 300,
+    minInterval:   60,
+    levelStep:     28,
+    linesPerLevel: 8,
+    scoreMulti:    2.0,
+    ghost:         false,
+    color:         '#e94560',
+  }
+};
+
+const canvas     = document.getElementById('board');
+const ctx        = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next-canvas');
+const nextCtx    = nextCanvas.getContext('2d');
+
+let board, piece, nextPiece, score, lines, level;
+let gameOver, paused, dropInterval, lastTime, animId, dropCounter;
+let currentMode = 'easy';
+
+// ── Helpers ──────────────────────────────────────────────
+
+function createBoard() {
+  return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+}
+
+function randomPiece() {
+  const id = Math.floor(Math.random() * 7) + 1;
+  const matrix = PIECES[id].map(r => [...r]);
+  return { id, matrix, x: Math.floor(COLS / 2) - Math.floor(matrix[0].length / 2), y: 0 };
+}
+
+function rotate(matrix) {
+  const N = matrix.length;
+  return matrix.map((row, r) => row.map((_, c) => matrix[N - 1 - c][r]));
+}
+
+function isValid(mat, offX, offY) {
+  for (let r = 0; r < mat.length; r++)
+    for (let c = 0; c < mat[r].length; c++) {
+      if (!mat[r][c]) continue;
+      const x = offX + c, y = offY + r;
+      if (x < 0 || x >= COLS || y >= ROWS) return false;
+      if (y >= 0 && board[y][x]) return false;
+    }
+  return true;
+}
+
+function merge() {
+  piece.matrix.forEach((row, r) =>
+    row.forEach((val, c) => { if (val) board[piece.y + r][piece.x + c] = val; })
+  );
+}
+
+function calcDropInterval(lvl) {
+  const m = MODES[currentMode];
+  return Math.max(m.minInterval, m.startInterval - (lvl - 1) * m.levelStep);
+}
+
+function clearLines() {
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(v => v !== 0)) {
+      board.splice(r, 1);
+      board.unshift(Array(COLS).fill(0));
+      cleared++; r++;
+    }
+  }
+  if (cleared) {
+    const base = [0, 100, 300, 500, 800][cleared] || 800;
+    score += Math.round(base * level * MODES[currentMode].scoreMulti);
+    lines += cleared;
+    level = Math.floor(lines / MODES[currentMode].linesPerLevel) + 1;
+    dropInterval = calcDropInterval(level);
+    updateUI();
+  }
+}
+
+// ── Drawing ───────────────────────────────────────────────
+
+function drawBlock(c, x, y, color, size = BLOCK) {
+  c.fillStyle = color;
+  c.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  c.fillStyle = 'rgba(255,255,255,0.15)';
+  c.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  c.fillRect(x * size + 1, y * size + 1, 4, size - 2);
+}
+
+function drawGhost() {
+  let ghostY = piece.y;
+  while (isValid(piece.matrix, piece.x, ghostY + 1)) ghostY++;
+  if (ghostY === piece.y) return;
+  piece.matrix.forEach((row, r) =>
+    row.forEach((val, c) => {
+      if (val) {
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect((piece.x + c) * BLOCK + 1, (ghostY + r) * BLOCK + 1, BLOCK - 2, BLOCK - 2);
+      }
+    })
+  );
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      ctx.strokeRect(c * BLOCK, r * BLOCK, BLOCK, BLOCK);
+
+  // board blocks
+  board.forEach((row, r) =>
+    row.forEach((val, c) => { if (val) drawBlock(ctx, c, r, COLORS[val]); })
+  );
+
+  if (piece) {
+    if (MODES[currentMode].ghost) drawGhost();
+    piece.matrix.forEach((row, r) =>
+      row.forEach((val, c) => {
+        if (val) drawBlock(ctx, piece.x + c, piece.y + r, COLORS[val]);
+      })
+    );
+  }
+}
+
+function drawNext() {
+  nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+  if (!nextPiece) return;
+  const size = 20;
+  const mat = nextPiece.matrix;
+  const offX = Math.floor((nextCanvas.width / size - mat[0].length) / 2);
+  const offY = Math.floor((nextCanvas.height / size - mat.length) / 2);
+  mat.forEach((row, r) =>
+    row.forEach((val, c) => {
+      if (val) {
+        nextCtx.fillStyle = COLORS[val];
+        nextCtx.fillRect((offX + c) * size + 1, (offY + r) * size + 1, size - 2, size - 2);
+      }
+    })
+  );
+}
+
+// ── UI ────────────────────────────────────────────────────
+
+function updateUI() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('lines').textContent = lines;
+  document.getElementById('level').textContent = level;
+}
+
+function showMessage(html) {
+  const el = document.getElementById('message');
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function hideMessage() {
+  document.getElementById('message').style.display = 'none';
+}
+
+// ── Piece logic ───────────────────────────────────────────
+
+function spawnPiece() {
+  piece = nextPiece || randomPiece();
+  nextPiece = randomPiece();
+  drawNext();
+  if (!isValid(piece.matrix, piece.x, piece.y)) {
+    gameOver = true;
+    const modeColor = MODES[currentMode].color;
+    showMessage(
+      `<span style="color:${modeColor}">GAME OVER</span><br>` +
+      `<span style="font-size:14px;color:#aaa">Score: ${score}</span><br>` +
+      `<span style="font-size:12px;color:#666">R to restart &nbsp;|&nbsp; M for menu</span>`
+    );
+  }
+}
+
+function drop() {
+  if (isValid(piece.matrix, piece.x, piece.y + 1)) {
+    piece.y++;
+  } else {
+    merge();
+    clearLines();
+    spawnPiece();
+  }
+}
+
+function hardDrop() {
+  while (isValid(piece.matrix, piece.x, piece.y + 1)) { piece.y++; score += 2; }
+  merge();
+  clearLines();
+  spawnPiece();
+  updateUI();
+}
+
+// ── Game loop ─────────────────────────────────────────────
+
+let dropCounterLocal = 0;
+
+function gameLoop(time = 0) {
+  if (!gameOver && !paused) {
+    const delta = time - lastTime;
+    lastTime = time;
+    dropCounterLocal += delta;
+    if (dropCounterLocal >= dropInterval) {
+      drop();
+      dropCounterLocal = 0;
+    }
+    draw();
+  }
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ── Init / navigation ─────────────────────────────────────
+
+function startGame(mode) {
+  currentMode = mode;
+
+  document.getElementById('mode-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'block';
+
+  const badge = document.getElementById('mode-badge');
+  badge.textContent = mode.toUpperCase();
+  badge.className = 'mode-badge ' + mode;
+
+  board = createBoard();
+  score = 0; lines = 0; level = 1;
+  dropInterval = calcDropInterval(1);
+  dropCounterLocal = 0;
+  lastTime = 0;
+  gameOver = false; paused = false;
+  piece = null; nextPiece = null;
+
+  hideMessage();
+  updateUI();
+  spawnPiece();
+  if (animId) cancelAnimationFrame(animId);
+  gameLoop();
+}
+
+function goToMenu() {
+  if (animId) cancelAnimationFrame(animId);
+  hideMessage();
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('mode-screen').style.display = 'flex';
+}
+
+// ── Keyboard ──────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('game-screen').style.display === 'none') return;
+
+  if (e.key === 'r' || e.key === 'R') { startGame(currentMode); return; }
+  if (e.key === 'm' || e.key === 'M') { goToMenu(); return; }
+  if (gameOver) return;
+
+  if (e.key === 'p' || e.key === 'P') {
+    paused = !paused;
+    if (paused) showMessage('PAUSED<br><span style="font-size:13px;color:#666">P to resume</span>');
+    else { hideMessage(); lastTime = performance.now(); }
+    return;
+  }
+  if (paused) return;
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      if (isValid(piece.matrix, piece.x - 1, piece.y)) piece.x--;
+      break;
+    case 'ArrowRight':
+      if (isValid(piece.matrix, piece.x + 1, piece.y)) piece.x++;
+      break;
+    case 'ArrowDown':
+      drop(); score++; updateUI(); dropCounterLocal = 0;
+      break;
+    case 'ArrowUp': {
+      const rot = rotate(piece.matrix);
+      if      (isValid(rot, piece.x,     piece.y)) piece.matrix = rot;
+      else if (isValid(rot, piece.x - 1, piece.y)) { piece.matrix = rot; piece.x--; }
+      else if (isValid(rot, piece.x + 1, piece.y)) { piece.matrix = rot; piece.x++; }
+      break;
+    }
+    case ' ':
+      e.preventDefault();
+      hardDrop();
+      break;
+  }
+  draw();
+});
+</script>
+</body>
+</html>
